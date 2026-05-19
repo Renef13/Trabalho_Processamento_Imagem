@@ -85,8 +85,11 @@ plant_disease/
 ├── data/
 │   └── selected/               # Subconjunto curado do PlantVillage
 │       ├── tomato_healthy/
-│       ├── tomato_blight/
-│       └── potato_early_blight/
+│       ├── tomato_early_blight/
+│       ├── tomato_late_blight/
+│       ├── potato_healthy/
+│       ├── potato_early_blight/
+│       └── potato_late_blight/
 │
 ├── utils/
 │   ├── io.py                   # Carregamento e salvamento de imagens
@@ -129,7 +132,7 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 
 # 4. Execute o pipeline em uma imagem
-python pipeline.py --image data/selected/tomato_blight/img001.jpg
+python pipeline.py --image data/selected/tomato_early_blight/img001.jpg
 ```
 
 Ou explore os notebooks na pasta `notebooks/` para execução interativa estágio a estágio.
