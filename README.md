@@ -19,7 +19,7 @@ severidade da infecção.
 
 **Por que técnicas clássicas?**
 A abordagem escolhida usa exclusivamente operações de PI implementadas com OpenCV,
-sem redes neurais, sem GPU, sem grandes volumes de dados rotulados. Isso torna o
+sem redes neurais, sem grandes volumes de dados rotulados. Isso torna o
 sistema:
 - **Interpretável:** cada decisão tem justificativa explícita no espaço de pixels
 - **Acessível:** roda em qualquer CPU comum, inclusive no Google Colab gratuito
@@ -73,7 +73,7 @@ aproximadamente 150–300 imagens de teste.
 | Matplotlib       | Visualizações e histogramas         |
 | Jupyter Notebook | Exploração interativa por estágio   |
 
-Não é necessário GPU. O ambiente pode ser configurado localmente ou via
+O ambiente pode ser configurado localmente ou via
 **Google Colab** (gratuito), que já possui todas as dependências instaladas.
 
 ---
