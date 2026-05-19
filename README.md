@@ -117,7 +117,7 @@ plant_disease/
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/seu-usuario/plant-disease-detection.git
+git clone https://github.com/Renef13/Trabalho_Processamento_Imagem.git
 cd plant-disease-detection
 
 # 2. Crie e ative o ambiente virtual
