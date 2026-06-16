@@ -16,7 +16,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
-__all__ = ["gaussian_blur", "resize_to_size"]
+__all__ = ["gaussian_blur", "resize_to_size", "preprocess"]
 
 
 def _ensure_odd_positive(x: int) -> int:
@@ -103,3 +103,43 @@ def resize_to_size(
 
     except Exception:
         return None
+
+
+def preprocess(
+    imagem: Optional[np.ndarray],
+    aplicar_blur: bool = True,
+    aplicar_resize: bool = True,
+    ksize: Tuple[int, int] = (5, 5),
+    sigmaX: float = 0.0,
+    size: Tuple[int, int] = (256, 256),
+    interpolation: int = cv2.INTER_AREA,
+) -> Optional[np.ndarray]:
+    """Executa a etapa 1 completa de pré-processamento.
+
+    A ordem padrão é:
+    1. suavização com GaussianBlur
+    2. redimensionamento para 256x256
+
+    Retorna a imagem processada ou None para input inválido.
+    """
+    if imagem is None:
+        return None
+
+    if not isinstance(imagem, np.ndarray):
+        return None
+
+    resultado = imagem
+
+    if aplicar_blur:
+        resultado = gaussian_blur(resultado, ksize=ksize, sigmaX=sigmaX)
+        if resultado is None:
+            return None
+
+    if aplicar_resize:
+        resultado = resize_to_size(
+            resultado,
+            size=size,
+            interpolation=interpolation,
+        )
+
+    return resultado
