@@ -11,12 +11,58 @@ básica de input.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
-__all__ = ["gaussian_blur", "resize_to_size", "preprocess"]
+__all__ = [
+    "PreprocessConfig",
+    "ImagePreprocessor",
+    "gaussian_blur",
+    "resize_to_size",
+    "preprocess",
+]
+
+
+@dataclass(frozen=True)
+class PreprocessConfig:
+    """Configuracao padrao da etapa de pre-processamento."""
+
+    aplicar_blur: bool = True
+    aplicar_resize: bool = True
+    ksize: Tuple[int, int] = (5, 5)
+    sigmaX: float = 0.0
+    size: Tuple[int, int] = (256, 256)
+    interpolation: int = cv2.INTER_AREA
+
+
+class ImagePreprocessor:
+    """Objeto responsavel pela etapa 1 do pipeline."""
+
+    def __init__(self, config: Optional[PreprocessConfig] = None) -> None:
+        self.config = config or PreprocessConfig()
+
+    def run(
+        self,
+        imagem: Optional[np.ndarray],
+        aplicar_blur: Optional[bool] = None,
+        aplicar_resize: Optional[bool] = None,
+    ) -> Optional[np.ndarray]:
+        config = self.config
+
+        return preprocess(
+            imagem,
+            aplicar_blur=config.aplicar_blur if aplicar_blur is None else aplicar_blur,
+            aplicar_resize=(
+                config.aplicar_resize if aplicar_resize is None else aplicar_resize
+            ),
+            ksize=config.ksize,
+            sigmaX=config.sigmaX,
+            size=config.size,
+            interpolation=config.interpolation,
+        )
 
 
 def _ensure_odd_positive(x: int) -> int:
