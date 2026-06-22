@@ -2,11 +2,14 @@
 
 import numpy as np
 import pytest
+import cv2
 
 from plant_disease.stage2_leaf_seg import (
     LeafSegmentationConfig,
     segment_leaf,
     segment_leaf_otsu,
+    extract_largest_contour,
+    apply_mask,
     LeafSegmenter,
 )
 
@@ -130,6 +133,131 @@ class TestSegmentLeafOtsuFunctionality:
         assert area > 0
 
 
+class TestExtractLargestContourValidation:
+    """Testes de validação para extract_largest_contour (F2.4)."""
+
+    def test_extract_largest_contour_none_input(self):
+        """Deve retornar None para input None."""
+        result = extract_largest_contour(None)
+        assert result is None
+
+    def test_extract_largest_contour_invalid_type(self):
+        """Deve retornar None para input não-ndarray."""
+        result = extract_largest_contour("not_an_image")
+        assert result is None
+
+    def test_extract_largest_contour_wrong_channels(self):
+        """Deve retornar None para imagem com múltiplos canais."""
+        wrong_mask = np.zeros((256, 256, 3), dtype=np.uint8)
+        result = extract_largest_contour(wrong_mask)
+        assert result is None
+
+    def test_extract_largest_contour_empty_mask(self):
+        """Deve retornar None para máscara vazia."""
+        empty_mask = np.zeros((256, 256), dtype=np.uint8)
+        result = extract_largest_contour(empty_mask)
+        assert result is None
+
+
+class TestExtractLargestContourFunctionality:
+    """Testes de funcionalidade para extract_largest_contour."""
+
+    def test_extract_largest_contour_single_blob(self):
+        """Deve extrair contorno de blob único."""
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        cv2.circle(mask, (128, 128), 50, 255, -1)
+
+        result = extract_largest_contour(mask, fill_contour=True)
+        assert result is not None
+        refined_mask, area = result
+        assert isinstance(refined_mask, np.ndarray)
+        assert isinstance(area, float)
+        assert area > 0
+
+    def test_extract_largest_contour_multiple_blobs(self):
+        """Deve extrair apenas o maior contorno."""
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        cv2.circle(mask, (100, 100), 30, 255, -1)  # Pequeno
+        cv2.circle(mask, (200, 200), 70, 255, -1)  # Grande
+
+        result = extract_largest_contour(mask, fill_contour=True)
+        assert result is not None
+        refined_mask, area = result
+        assert area > 0
+
+
+class TestApplyMaskValidation:
+    """Testes de validação para apply_mask (F2.5)."""
+
+    def test_apply_mask_none_inputs(self):
+        """Deve retornar None para inputs None."""
+        result = apply_mask(None, None)
+        assert result is None
+
+    def test_apply_mask_none_image(self):
+        """Deve retornar None para imagem None."""
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        result = apply_mask(None, mask)
+        assert result is None
+
+    def test_apply_mask_none_mask(self):
+        """Deve retornar None para máscara None."""
+        image = np.zeros((256, 256, 3), dtype=np.uint8)
+        result = apply_mask(image, None)
+        assert result is None
+
+    def test_apply_mask_wrong_mask_dtype(self):
+        """Deve retornar None para máscara com dtype errado."""
+        image = np.zeros((256, 256, 3), dtype=np.uint8)
+        wrong_mask = np.zeros((256, 256), dtype=np.float32)
+        result = apply_mask(image, wrong_mask)
+        assert result is None
+
+    def test_apply_mask_shape_mismatch(self):
+        """Deve retornar None quando imagem e máscara têm tamanhos diferentes."""
+        image = np.zeros((256, 256, 3), dtype=np.uint8)
+        mask = np.zeros((200, 200), dtype=np.uint8)
+        result = apply_mask(image, mask)
+        assert result is None
+
+
+class TestApplyMaskFunctionality:
+    """Testes de funcionalidade para apply_mask."""
+
+    def test_apply_mask_bgr_image(self):
+        """Deve aplicar máscara a imagem BGR."""
+        image = np.ones((256, 256, 3), dtype=np.uint8) * 128
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        mask[50:150, 50:150] = 255
+
+        result = apply_mask(image, mask)
+        assert result is not None
+        assert result.shape == image.shape
+        assert result.dtype == np.uint8
+
+    def test_apply_mask_gray_image(self):
+        """Deve aplicar máscara a imagem em tons de cinza."""
+        image = np.ones((256, 256), dtype=np.uint8) * 128
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        mask[50:150, 50:150] = 255
+
+        result = apply_mask(image, mask)
+        assert result is not None
+        assert result.shape == image.shape
+        assert result.dtype == np.uint8
+
+    def test_apply_mask_preserves_masked_region(self):
+        """Deve preservar região dentro da máscara."""
+        image = np.full((256, 256, 3), 100, dtype=np.uint8)
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        mask[50:150, 50:150] = 255
+
+        result = apply_mask(image, mask)
+        assert result is not None
+        assert np.any(result[50:150, 50:150] > 0)
+        assert np.all(result[0:50, 0:50] == 0)
+
+
 class TestLeafSegmenterClass:
     """Testes para a classe LeafSegmenter."""
 
@@ -167,6 +295,30 @@ class TestLeafSegmenterClass:
         mask, area = result
         assert area > 0
 
+    def test_leaf_segmenter_refine_with_contour(self):
+        """Deve refinar máscara com contorno (F2.4)."""
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        cv2.circle(mask, (128, 128), 50, 255, -1)
+
+        segmenter = LeafSegmenter()
+        result = segmenter.refine_with_contour(mask)
+        assert result is not None
+        refined_mask, area = result
+        assert area > 0
+
+    def test_leaf_segmenter_extract_leaf_region(self):
+        """Deve extrair região foliar (F2.5)."""
+        image = np.full((256, 256, 3), 100, dtype=np.uint8)
+        mask = np.zeros((256, 256), dtype=np.uint8)
+        mask[50:150, 50:150] = 255
+
+        segmenter = LeafSegmenter()
+        result = segmenter.extract_leaf_region(image, mask)
+        assert result is not None
+        assert result.shape == image.shape
+
 
 if __name__ == "__main__":
+    import cv2
     pytest.main([__file__, "-v"])
+
