@@ -32,6 +32,7 @@ from typing import Dict, Optional
 
 from matplotlib.figure import Figure
 
+import cv2
 from plant_disease.utils.io import load_image
 from plant_disease.utils.color import bgr_to_hsv, bgr_to_rgb
 from plant_disease.stage1_preproc import preprocess, PreprocessConfig
@@ -40,7 +41,11 @@ from plant_disease.stage2_leaf_seg import (
     extract_largest_contour,
     LeafSegmentationConfig,
 )
-from plant_disease.stage3_lesion import detect_lesions, LesionDetectionConfig
+from plant_disease.stage3_lesion import (
+    detect_lesions,
+    segment_lesions_hsv,
+    LesionDetectionConfig,
+)
 from plant_disease.stage4_analysis import (
     analyze,
     create_result_panel,
@@ -161,8 +166,12 @@ def process_image(
         return _resultado_com_erro(path, "Falha na conversao BGR->HSV")
 
     # 4. Segmentar folha (HSV + morfologia) e refinar com maior contorno
+    # MELHORIA: A estrutura da folha agora considera tanto áreas verdes quanto áreas
+    # de lesão para evitar "buracos" na máscara final da folha.
     lcfg = cfg.leaf_config
-    leaf_result = segment_leaf(
+    
+    # Máscara de tons verdes (padrão)
+    leaf_result_green = segment_leaf(
         hsv,
         h_min=lcfg.h_min,
         h_max=lcfg.h_max,
@@ -170,24 +179,38 @@ def process_image(
         s_max=lcfg.s_max,
         v_min=lcfg.v_min,
         v_max=lcfg.v_max,
-        aplicar_morph=lcfg.aplicar_morph,
-        morph_kernel_size=lcfg.morph_kernel_size,
-        morph_iterations=lcfg.morph_iterations,
+        aplicar_morph=False # Morfologia será aplicada na união
     )
-    if leaf_result is None:
-        return _resultado_com_erro(path, "Falha na segmentacao da folha (F2)")
+    
+    # Máscara de tons de lesão (amarelo/marrom)
+    lesion_raw = segment_lesions_hsv(hsv, config=cfg.lesion_config)
+    
+    if leaf_result_green is None or lesion_raw is None:
+        return _resultado_com_erro(path, "Falha na segmentacao inicial (F2/F3)")
+        
+    mask_green, _ = leaf_result_green
+    
+    # União: Estrutura completa da folha
+    leaf_structure_raw = cv2.bitwise_or(mask_green, lesion_raw)
+    
+    # Aplicar morfologia na estrutura completa para limpar ruídos e fechar buracos
+    if lcfg.aplicar_morph:
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, lcfg.morph_kernel_size)
+        leaf_structure_raw = cv2.morphologyEx(
+            leaf_structure_raw, cv2.MORPH_OPEN, kernel, iterations=lcfg.morph_iterations
+        )
+        leaf_structure_raw = cv2.morphologyEx(
+            leaf_structure_raw, cv2.MORPH_CLOSE, kernel, iterations=lcfg.morph_iterations
+        )
 
-    raw_leaf_mask, _raw_area = leaf_result
-
-    contour_result = extract_largest_contour(raw_leaf_mask)
+    # Extrair maior contorno da estrutura completa
+    contour_result = extract_largest_contour(leaf_structure_raw)
     if contour_result is None:
-        # Folha nao detectada (nenhum contorno verde encontrado) - nao e
-        # um crash, e um resultado valido de "sem folha na imagem".
         return _resultado_com_erro(path, "Folha nao detectada (nenhum contorno)")
 
     leaf_mask, _contour_area = contour_result
 
-    # 5. Detectar lesões (já restritas à folha por construção, F3.3)
+    # 5. Detectar lesões (agora restritas à estrutura completa da folha)
     lesion_result = detect_lesions(hsv, leaf_mask, config=cfg.lesion_config)
     if lesion_result is None:
         return _resultado_com_erro(path, "Falha na deteccao de lesoes (F3)")

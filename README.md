@@ -33,8 +33,8 @@ sistema:
 Dada uma imagem de folha de planta, o pipeline executa
 quatro estágios sequenciais e retorna:
 
-1. **Máscara da folha** — isola a região foliar do fundo da imagem
-2. **Máscara de lesões** — identifica os pixels correspondentes a tecido doente
+1. **Máscara da folha** — isola a região foliar do fundo da imagem. O sistema utiliza uma abordagem robusta que combina tons de verde com tons de lesão (amarelo/marrom) para garantir que folhas severamente doentes não apresentem "buracos" na segmentação.
+2. **Máscara de lesões** — identifica os pixels correspondentes a tecido doente dentro da área da folha.
 3. **Porcentagem de área afetada** — métrica objetiva calculada em pixels
 4. **Nível de severidade** — classificação automática em quatro categorias
 5. **Painel visual** — imagem original + máscaras + histograma de cor, lado a lado
